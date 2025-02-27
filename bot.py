@@ -297,7 +297,11 @@ def main() -> None:
     application.add_handler(CommandHandler('help', help_command))
     
     logger.info("Бот запущен ✨")
-    application.run_polling()
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", 8443)),
+        webhook_url=f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/telegram"
+    )
 
 if __name__ == '__main__':
     main()
