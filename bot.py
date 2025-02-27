@@ -226,17 +226,17 @@ async def additional(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Формируем отчёт
     summary = (
         "🚨 *НОВЫЙ ЗАПРОС* 🚨\n\n"
-        f"👤 *Пользователь:* {context.user_data['who']} (@{context.user_data['username']})\n"
-        f"📍 *Локация:* {context.user_data['location']}\n"
+        f"👤 *Пользователь:* {escape_markdown(context.user_data['who'])}\n"
+        f"📍 *Локация:* {escape_markdown(context.user_data['location'])}\n"
     )
-    
+
     if 'Удалёнка' in context.user_data['location']:
-        summary += f"🔗 *AnyDesk:* `{context.user_data['anydesk']}`\n"
-        
+        summary += f"🔗 *AnyDesk:* `{escape_markdown(context.user_data['anydesk'])}`\n"
+
     summary += (
-        f"🖥️ *Проблема:* {context.user_data['problem']}\n"
-        f"⏳ *Срочность:* {context.user_data['urgency']}\n"
-        f"📦 *Дополнительно:* {additional_info}\n\n"
+        f"🖥️ *Проблема:* {escape_markdown(context.user_data['problem'])}\n"
+        f"⏳ *Срочность:* {escape_markdown(context.user_data['urgency'])}\n"
+        f"📦 *Дополнительно:* {escape_markdown(additional_info)}\n\n"
         "✅ Запрос отправлен в поддержку!"
     )
     
