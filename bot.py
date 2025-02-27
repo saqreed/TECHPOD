@@ -11,6 +11,7 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler
 )
+from telegram import escape_markdown  # Добавлено экранирование
 
 # Инициализация окружения
 load_dotenv()
@@ -54,8 +55,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['username'] = user.username or 'не указан'
     
     await update.message.reply_text(
-        "✨ *Добро пожаловать!* ✨\n\n"
-        "Выберите действие:",
+        "✨ *Добро пожаловать!* ✨\n\nВыберите действие:",
         parse_mode='Markdown',
         reply_markup=ReplyKeyboardMarkup(
             MAIN_KEYBOARD,
@@ -63,7 +63,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             resize_keyboard=True
         )
     )
-    return ConversationHandler.END  # Выходим из основного диалога
+    return ConversationHandler.END
 
 async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /faq"""
@@ -87,7 +87,7 @@ async def handle_faq_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     
-    answer = FAQ_DATABASE.get(query.data, "Извините, ответ пока не доступен. Мы скоро добавим информацию!")
+    answer = FAQ_DATABASE.get(query.data, "Извините, ответ пока недоступен. Мы скоро добавим информацию!")
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Назад", callback_data='faq_main')]])
     
     await query.edit_message_text(
@@ -107,7 +107,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode='Markdown'
     )
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def start_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начало диалога"""
     user = update.message.from_user
     context.user_data['username'] = user.username or 'не указан'
@@ -143,9 +143,7 @@ async def who(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка локации"""
     loc = update.message.text.strip()
-    
-    # Исправленная проверка допустимых локаций
-    valid_locations = LOCATION_KEYBOARD[0]  # Прямое получение списка кнопок
+    valid_locations = [item for sublist in LOCATION_KEYBOARD for item in sublist]
     
     if loc not in valid_locations:
         await update.message.reply_text("❌ Используйте кнопки для выбора локации:")
@@ -168,7 +166,7 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "_Максимум 500 символов_",
             parse_mode='Markdown'
         )
-        return PROBLEM
+        return PROBLEM 
 
 async def anydesk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Проверка AnyDesk ID"""
@@ -223,16 +221,16 @@ async def additional(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     additional_info = update.message.text.strip() or "Не предоставлено"
     context.user_data['additional'] = additional_info
     
-    # Формируем отчёт
+    # Формируем отчёт с экранированием
     summary = (
         "🚨 *НОВЫЙ ЗАПРОС* 🚨\n\n"
         f"👤 *Пользователь:* {escape_markdown(context.user_data['who'])}\n"
         f"📍 *Локация:* {escape_markdown(context.user_data['location'])}\n"
     )
-
+    
     if 'Удалёнка' in context.user_data['location']:
         summary += f"🔗 *AnyDesk:* `{escape_markdown(context.user_data['anydesk'])}`\n"
-
+        
     summary += (
         f"🖥️ *Проблема:* {escape_markdown(context.user_data['problem'])}\n"
         f"⏳ *Срочность:* {escape_markdown(context.user_data['urgency'])}\n"
@@ -248,7 +246,7 @@ async def additional(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     
     # Отправляем админу
-    admin_summary = f"{summary}\n\n_Отправил: @{context.user_data['username']} ({context.user_data['who']})_"
+    admin_summary = f"{summary}\n\n_Отправил: @{escape_markdown(context.user_data['username'])} ({escape_markdown(context.user_data['who'])})_"
     
     try:
         await context.bot.send_message(
@@ -278,10 +276,13 @@ def main() -> None:
         return
         
     application = Application.builder().token(TOKEN).build()
+    
+    # Регистрация обработчиков
     application.add_handler(CommandHandler('faq', faq_command))
     application.add_handler(CallbackQueryHandler(handle_faq_buttons))
+    
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CommandHandler('start', start_request)],
         states={
             WHO: [MessageHandler(filters.TEXT & ~filters.COMMAND, who)],
             LOCATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, location)],
@@ -296,11 +297,13 @@ def main() -> None:
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler('help', help_command))
     
+    # Настройка вебхука для Render
     logger.info("Бот запущен ✨")
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.getenv("PORT", 8443)),
-        webhook_url=f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/telegram"
+        webhook_url=f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/telegram",
+        secret_token=os.getenv('WEBHOOK_SECRET', 'render_webhook_123')  # Укажите свой секрет
     )
 
 if __name__ == '__main__':
